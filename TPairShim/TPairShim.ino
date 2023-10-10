@@ -22,7 +22,7 @@ char ctrlBuffer[ctrlBuffer_length];
 
 int8_t channels_used[NUM_B][NUM_C]  =
 {
-  {0},//, 1, 2, 3, 4, 5, 6, 7},
+  {0,1},//, 1, 2, 3, 4, 5, 6, 7},
 //  {0, 1, 2, 3, 4, 5, 6, 7},
 //  {0, 1, 2, 3, 4, 5, 6, 7},
 //  {0, 1, 2, 3, 4, 5, 6, 7}
@@ -198,7 +198,7 @@ void loop() {
             zero_all();
             break;
           case 'C':
-            for (int i = 0; i < 1; i++) {
+            for (int i = 0; i < 2; i++) {
               calibrate_channel(0, i);
             }
 //            for (int i = 0; i < 8; i++) {

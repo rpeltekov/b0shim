@@ -1,7 +1,7 @@
 #include "t3spi.h"
 
 #define NUM_B 1//number of boards
-#define NUM_C 1//number of channels per board
+#define NUM_C 2//number of channels per board
 
 typedef enum LTC26456_COMMAND {
   WRITE_TO_INPUT             = 0x00,
@@ -43,7 +43,7 @@ const bool bncOut = true;
 
 LTC2656_ADDRESS channelMap[] = {DAC_E, DAC_F, DAC_G, DAC_H, DAC_A, DAC_B, DAC_C, DAC_D};
 uint8_t channelMap_ADC[] = {0, 4, 1, 5, 2, 6, 3, 7};
-const int boardMap[NUM_B] = {2};//{3,4,5,6};//{3,2,1,0};   % new board map feb 2020,  6-->0,  5-->1,  4-->2,  3-->3
+const int boardMap[NUM_B] = {3};//{3,4,5,6};//{3,2,1,0};   % new board map feb 2020,  6-->0,  5-->1,  4-->2,  3-->3
 //const int boardMap[NUM_B] = {3};//{3,4,5,6};   
 
 
