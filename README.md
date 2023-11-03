@@ -1,4 +1,4 @@
-# b0Shimming Project 5th year Masters
+# b0Shimming Project
 
 Working to simulate and show that it is possible to correct for b0 inhomogeneity
 caused by a TMS coil using a headcap of flexible and conforming RF coils 
