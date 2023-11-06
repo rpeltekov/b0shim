@@ -86,13 +86,13 @@ def gen_loop_ancors(n=0):
     if n==15:
         # 7 aroung the middle, a row of 7 above that, and then 1 at the top
         pistep = 2*np.pi/7
-        pis = np.arange(0, 2*pi, pistep)
+        pis = np.arange(0, 2*np.pi, pistep)
         
-        bottom = np.hstack((np.cos(pis), np.sin(pis), np.zeros(7)))
+        bottom = np.vstack((np.cos(pis), np.sin(pis), np.zeros(7))).T
         # for now place the middle row at 45 degrees on top of the bottom row
-        middle = np.hstack((np.cos(pis), np.sin(pis), np.ones(7)))
+        middle = np.vstack((np.cos(pis+pistep/2), np.sin(pis+pistep/2), np.ones(7)*.9)).T
         top = [0, 0, 1]
-
+        
         ancors = np.vstack((bottom, middle, top))
     return ancors
 
@@ -191,15 +191,15 @@ def plot_save_field_slices(field, x, y, z, Z, folder, coilname, vis=False):
 
 def plot_coils(coils, volume=None, field=None, pos=None, folder=None,
                name=None, vis=False):
-    plt.clf()
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
     # TODO: fix this logic it is so stupid but ig you just need something that
     # works
     if volume is not None:
-        start = volume[0]
-        end = volume[0] + volume[1]
+        maxdim = np.max(volume[1])*np.ones(3)
+        start = -maxdim/2
+        end = start + maxdim
         ax.set_xlim(start[0], end[0])
         ax.set_ylim(start[1], end[1])
         ax.set_zlim(start[2], end[2])
@@ -244,8 +244,6 @@ def plot_ancors_on_circle(ancors, r, R, volume, folder, vis):
         
     plot_coils(coils, volume=volume, folder=folder, vis=vis)
 
-
-
 def injest_coils(filename):
   pass
 
@@ -262,8 +260,8 @@ if __name__ == "__main__":
     parser.add_argument("--fovY", type=int, default=20, help="")
     parser.add_argument("--fovZ", type=int, default=20, help="")
     parser.add_argument("--numcoils", type=int, default=0, help="")
-    parser.add_argument("--R", type=int, default=10, help="")
-    parser.add_argument("--r", type=int, default=5, help="")
+    parser.add_argument("--R", type=float, default=10., help="")
+    parser.add_argument("--r", type=float, default=5., help="")
     parser.add_argument("--vis", action="store_true", help="")
     parser.add_argument("--nosave", action="store_false", help="")
 
@@ -281,14 +279,14 @@ if __name__ == "__main__":
     start = -fov/2
     volume_def = np.vstack((start, fov, res))
 
-    print(f"[INFO] Headcap Setup:\n   VOLUME=\n{volume_def}\n    R={R}, r={r}") 
+    print(f"[INFO] Headcap Setup:\n   VOLUME={volume_def}\n   R={R}, r={r}") 
     np.savetxt(os.path.join(folder, "volume_def.txt"),
                np.vstack((volume_def, [R,r, args.numcoils])))
 
     if folder == "default":
         print("[INFO] doing default coil calculations: octohedron")
     else:
-        print(f"[INFO] calculating basis maps for: {folder} headcap")
+        print(f"[INFO] calculating basis maps in {folder}")
 
     ancors = gen_loop_ancors(args.numcoils)
     plot_ancors_on_circle(ancors, r, R, volume_def, folder, args.vis)   
