@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import sys, os
-sys.path.append('../../tools/biot-savart-master')
+sys.path.append('../tools/biot-savart-master')
 import biot_savart_v4_3 as bs
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm as diverge
@@ -125,8 +125,6 @@ def compute_bzfields(coils, volume, folder, vis=False, debug=False):
 
         if z is None, it will return the magnetization for the whole volume.
     """
-    np.savetxt(os.path.join(folder, "volume_def.txt"), volume)
-
     start = volume[0]
     size = volume[1]
     end = start + size
@@ -233,7 +231,6 @@ def plot_coils(coils, volume=None, field=None, pos=None, folder=None,
 def plot_ancors_on_circle(ancors, r, R, volume, folder, vis):
 
     # add the sphere to the drawing
-    # TODO: currently covers the actual coils not nicely
     # u = np.linspace(0, 2 * np.pi, 100)
     # v = np.linspace(0, np.pi, 100)
     # x = 1.9*R * np.outer(np.cos(u), np.sin(v))
@@ -272,18 +269,21 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    res = np.array([args.resX, args.resY, args.resZ])
-    fov = np.array([args.fovX, args.fovY, args.fovZ])
-    start = -fov/2
-    volume_def = np.vstack((start, fov, res))
-    print(f"[INFO]: VOLUME: \n{volume_def}")
-
     folder = os.path.join("../data/headcaps", args.folder)
     if not os.path.exists(folder):
         os.makedirs(folder)
 
     r = args.r
     R = args.R
+
+    res = np.array([args.resX, args.resY, args.resZ])
+    fov = np.array([args.fovX, args.fovY, args.fovZ])
+    start = -fov/2
+    volume_def = np.vstack((start, fov, res))
+
+    print(f"[INFO] Headcap Setup:\n   VOLUME=\n{volume_def}\n    R={R}, r={r}") 
+    np.savetxt(os.path.join(folder, "volume_def.txt"),
+               np.vstack((volume_def, [R,r, args.numcoils])))
 
     if folder == "default":
         print("[INFO] doing default coil calculations: octohedron")
