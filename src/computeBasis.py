@@ -133,9 +133,9 @@ def compute_bzfields(coils, volume, folder, vis=False, debug=False):
     y = np.linspace(start[1], end[1], int(res[1])+1)[:-1]
     z = np.linspace(start[2], end[2], int(res[2])+1)[:-1]
 
-    x = x + (x[1] - x[2])/2
-    y = y + (y[1] - y[2])/2
-    z = z + (z[1] - z[2])/2
+    x = x + (x[1] - x[0])/2
+    y = y + (y[1] - y[0])/2
+    z = z + (z[1] - z[0])/2
 
     X, Y, Z = np.meshgrid(x, y, z)
     Z = Z.flatten()
@@ -256,9 +256,9 @@ if __name__ == "__main__":
                         help="NUMBER OF VOXELS NOT VOXEL SIZE")
     parser.add_argument("--resZ", type=int, default=16,
                         help="NUMBER OF VOXELS NOT VOXEL SIZE")
-    parser.add_argument("--fovX", type=int, default=20, help="")
-    parser.add_argument("--fovY", type=int, default=20, help="")
-    parser.add_argument("--fovZ", type=int, default=20, help="")
+    parser.add_argument("--fovX", type=float, default=20, help="")
+    parser.add_argument("--fovY", type=float, default=20, help="")
+    parser.add_argument("--fovZ", type=float, default=20, help="")
     parser.add_argument("--numcoils", type=int, default=0, help="")
     parser.add_argument("--R", type=float, default=10., help="")
     parser.add_argument("--r", type=float, default=5., help="")
