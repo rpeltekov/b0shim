@@ -96,7 +96,7 @@ def gen_loop_ancors(n=0):
         ancors = np.vstack((bottom, middle, top))
     return ancors
 
-def gen_coils(ancors, r, R, folder="", n=501):
+def gen_coils(ancors, r, R, folder="", gradient=False, n=501):
     """
     create geometries of the coils with 1 amp set to a folder with the given
     folder
@@ -104,8 +104,19 @@ def gen_coils(ancors, r, R, folder="", n=501):
     coils = []
     if not os.path.exists(folder):
         os.makedirs(folder)
+
+    if gradient:
+        for i in range(3):
+            coil_folder_filepath = os.path.join(folder, f"coil_{i}")
+            if not os.path.exists(coil_folder_filepath):
+                os.makedirs(coil_folder_filepath)
+
     for i, ancor in enumerate(ancors):
-        coil_folder_filepath = os.path.join(folder, f"coil_{i}")
+        if gradient:
+            coil_folder_filepath = os.path.join(folder, f"coil_{i+3}")
+        else:
+            coil_folder_filepath = os.path.join(folder, f"coil_{i}")
+
         coil = coil_from_ancor(ancor, r, R, n);
         # add the current values of 1 to each of the segments
         coil = np.hstack((coil, np.ones((coil.shape[0], 1))))
@@ -119,7 +130,7 @@ def gen_coils(ancors, r, R, folder="", n=501):
     
     return coils
 
-def compute_bzfields(coils, volume, folder, vis=False, debug=False):
+def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=False):
     """
         generate the delt bz magnetization that the coil generates at pos z
 
@@ -148,7 +159,23 @@ def compute_bzfields(coils, volume, folder, vis=False, debug=False):
         print(f"DEBUG: Z shape {Z.shape} {Z}")
 
     fields = []
+    if gradient:
+        g = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]]) # gaus per cm
+        together = np.vstack((X, Y, Z))
+        for i in range(3):
+            coilname = f"coil_{i}"
+            field_folder_filepath = os.path.join(folder, coilname)
+            field = g[i].dot(together) * gyro
+            plot_save_field_slices(np.vstack((np.zeros(field.shape),
+                                             np.zeros(field.shape), 
+                                             field)).T, 
+                                   x, y, z, Z, field_folder_filepath,
+                                   coilname, vis)
+            np.save(os.path.join(field_folder_filepath, "field.npy"), field)
+
     for i, coil in enumerate(coils):
+        if gradient:
+            i = i+3
         coilname = f"coil_{i}"
         print(f"[INFO]  Computing field for {coilname}")
         field_folder_filepath = os.path.join(folder, coilname)
@@ -165,8 +192,7 @@ def compute_bzfields(coils, volume, folder, vis=False, debug=False):
 
         plot_save_field_slices(field, x, y, z, Z, field_folder_filepath,
                                coilname, vis)
-        np.savetxt(os.path.join(field_folder_filepath, "field.csv"), 
-                   field, delimiter=", ")
+        np.save(os.path.join(field_folder_filepath, "field.npy"), field[:,2])
 
 def plot_save_field_slices(field, x, y, z, Z, folder, coilname, vis=False):
     for zlevel in z:
@@ -262,6 +288,7 @@ if __name__ == "__main__":
     parser.add_argument("--numcoils", type=int, default=0, help="")
     parser.add_argument("--R", type=float, default=10., help="")
     parser.add_argument("--r", type=float, default=5., help="")
+    parser.add_argument("--gradient", action="store_true", help="")
     parser.add_argument("--vis", action="store_true", help="")
     parser.add_argument("--nosave", action="store_false", help="")
 
@@ -281,7 +308,7 @@ if __name__ == "__main__":
 
     print(f"[INFO] Headcap Setup:\n   VOLUME={volume_def}\n   R={R}, r={r}") 
     np.savetxt(os.path.join(folder, "volume_def.txt"),
-               np.vstack((volume_def, [R,r, args.numcoils])))
+               np.vstack((volume_def, [R,r, args.numcoils + 3*args.gradient])))
 
     if folder == "default":
         print("[INFO] doing default coil calculations: octohedron")
@@ -290,7 +317,7 @@ if __name__ == "__main__":
 
     ancors = gen_loop_ancors(args.numcoils)
     plot_ancors_on_circle(ancors, r, R, volume_def, folder, args.vis)   
-    coils = gen_coils(ancors, r, R, folder)
-    compute_bzfields(coils, volume_def, folder, args.vis)
+    coils = gen_coils(ancors, r, R, folder, args.gradient)
+    compute_bzfields(coils, volume_def, folder, args.vis, args.gradient)
 
 

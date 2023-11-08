@@ -71,8 +71,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="3d basis")
     parser.add_argument("folder1", type=str,default=0, help="")
     parser.add_argument("folder2", type=str,default=0, help="")
-    parser.add_argument("--voxX", type=int,default=1.5, help="")
-    parser.add_argument("--voxY", type=int,default=1.5, help="")
+    parser.add_argument("--voxX", type=int,default=0.9375, help="")
+    parser.add_argument("--voxY", type=int,default=0.9375, help="")
     parser.add_argument("--voxZ", type=int,default=1.6, help="")
     parser.add_argument("--debug", action="store_true", help="")
 
@@ -113,20 +113,33 @@ if __name__ == "__main__":
 
     tms_basis = deltfreq2-deltfreq1
     np.save(os.path.join(comb_dir,"basis.npy"), tms_basis)
-
+    
+    b0offres = os.path.join(comb_dir, "differencemap")
+    if not os.path.exists(b0offres):
+        os.makedirs(b0offres)
+    
     for slice in range(deltfreq1.shape[2]):
+
         fig, ax = plt.subplots(1,3, figsize=(15, 5))
         z = (slice-deltfreq1.shape[2]/2)* 1.6/10
         plt.title(f"Off resonance, at z={z}cm")
-        im0 = ax[0].imshow(deltfreq1[:,:,slice], cmap='RdYlGn')
+        im0 = ax[0].imshow(deltfreq1[:,:,slice], cmap='jet')
         ax[0].set_title(f"Hz of {args.folder1}")
         fig.colorbar(im0, ax=ax[0])
-        im1 = ax[1].imshow(deltfreq2[:,:,slice], cmap='RdYlGn')
+        im1 = ax[1].imshow(deltfreq2[:,:,slice], cmap='jet')
         ax[1].set_title(f"Hz of {args.folder2}")
         fig.colorbar(im1, ax=ax[1])
-        im2 = ax[2].imshow(tms_basis[:,:,slice], cmap='RdYlGn')
+        im2 = ax[2].imshow(tms_basis[:,:,slice], cmap='jet')
         fig.colorbar(im2, ax=ax[2])
         ax[2].set_title(f"Off Resonance Due to TMS (Hz)") 
         #plt.show()
         plt.savefig(os.path.join(comb_dir, f"offres_{z}z.png"))
+        plt.close()
+
+        
+        plt.imshow(tms_basis[:,:,slice], cmap='jet')
+        plt.title(f"offres due to tms z = {z}")
+        plt.clim(-100, 100)
+        plt.colorbar()
+        plt.savefig(os.path.join(b0offres, f"{slice}.png"))
         plt.close()
