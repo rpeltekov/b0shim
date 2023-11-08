@@ -190,8 +190,8 @@ if __name__ == "__main__":
             plt.savefig(os.path.join(b0offres, f"{z}.png"))
             plt.close()
     else:
-        start = volume[0].astype(int)
-        end = volume[0].astype(int) + volume[1].astype(int)
+        start = volume[0].astype(float)
+        end = volume[0].astype(float) + volume[1].astype(float)
 
         xx = np.linspace(start[0], end[0], int(offres.shape[0])+1)[:-1]
         yy = np.linspace(start[1], end[1], int(offres.shape[1])+1)[:-1]
@@ -314,18 +314,33 @@ if __name__ == "__main__":
         ma = max(np.max(outputmaps), np.max(references))
         mi = min(np.min(outputmaps), np.min(references))
 
+        np.save(os.path.join(infodir, "corrected_cropped_offres.npy"), outputmaps)
+        np.save(os.path.join(infodir, "original_cropped_offres.npy"), references)
+
         print('[INFO] Saving figures')
 
         for i, zi in enumerate(zis):
-            fig, ax = plt.subplots(1,2, figsize=(12, 5))
+            fig, ax = plt.subplots(1,2, figsize=(14, 5))
 
             im0 = ax[0].imshow(references[i], cmap='jet')
             ax[0].set_title("original off resonance (Hz)")
+            ax[0].set_xlabel("X (cm)")
+            ax[0].set_xticks(np.linspace(-.5,int(offres.shape[0])-.5,9), 
+                         np.linspace(start[0], end[0], 9))
+            ax[0].set_ylabel("Y (cm)")
+            ax[0].set_yticks(np.linspace(-.5,int(offres.shape[1])-.5,9), 
+                       np.linspace(start[1], end[1], 9))
             im0.set_clim(mi, ma)
             fig.colorbar(im0, ax=ax[0], fraction=0.046, pad=0.04)
             
             im1 = ax[1].imshow(outputmaps[i], cmap='jet')
             ax[1].set_title(f"corrected off resonance (Hz) z={zz[zi].round(2)}")
+            ax[1].set_xlabel("X (cm)")
+            ax[1].set_xticks(np.linspace(-.5,int(offres.shape[0])-.5,9),
+                             np.linspace(start[0], end[0], 9))
+            ax[1].set_ylabel("Y (cm)")
+            ax[1].set_yticks(np.linspace(-.5,int(offres.shape[1])-.5,9), 
+                             np.linspace(start[1], end[1], 9))
             im1.set_clim(mi, ma)
             fig.colorbar(im1, ax=ax[1], fraction=0.046, pad=0.04)
 

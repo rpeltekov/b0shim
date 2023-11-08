@@ -1,4 +1,5 @@
 import argparse
+import threading
 import numpy as np
 import sys, os
 sys.path.append('../tools/biot-savart-master')
@@ -173,7 +174,7 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
                                    coilname, vis)
             np.save(os.path.join(field_folder_filepath, "field.npy"), field)
 
-    for i, coil in enumerate(coils):
+    def compute_coil_field(i, coil):
         if gradient:
             i = i+3
         coilname = f"coil_{i}"
@@ -183,16 +184,25 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
         field = bs.calculate_field(coil.T, X,Y,Z)
         field = field * gyro
 
-        if debug:
-            # print the quiver plot of the coil and its field vectors
-            plot_coils(coil[:,:-1], volume=volume, field=field, 
-                       pos=np.vstack((X,Y,Z)), vis=True)
-        plot_coils(coil[:,:-1], volume=volume, 
-                   folder=field_folder_filepath, name=coilname, vis=vis)
+        #if debug:
+        #    # print the quiver plot of the coil and its field vectors
+        #    plot_coils(coil[:,:-1], volume=volume, field=field, 
+        #               pos=np.vstack((X,Y,Z)), vis=True)
+        #plot_coils(coil[:,:-1], volume=volume, 
+        #           folder=field_folder_filepath, name=coilname, vis=vis)
 
-        plot_save_field_slices(field, x, y, z, Z, field_folder_filepath,
-                               coilname, vis)
+        #plot_save_field_slices(field, x, y, z, Z, field_folder_filepath,
+        #                       coilname, vis)
         np.save(os.path.join(field_folder_filepath, "field.npy"), field[:,2])
+
+    threads = []
+    for i, coil in enumerate(coils):
+        threads.append(threading.Thread(target=compute_coil_field, 
+                                        args=(i,coil)))
+        threads[i].start()
+    for thread in threads:
+        thread.join()
+        
 
 def plot_save_field_slices(field, x, y, z, Z, folder, coilname, vis=False):
     for zlevel in z:
