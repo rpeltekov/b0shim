@@ -77,6 +77,7 @@ def gen_loop_ancors(n=0):
        n: [int] the number of points to pattern onto the surface
        n=0 -> means that we generate the basic octohedron
     """
+    ancors = []
     if n==0:
         ancors = [[ 1, 0, 0], [-1, 0, 0], [ 0, 1, 0], [ 0,-1, 0], [ 0, 0, 1],
                   [ 0, 0,-1], [ 1, 1, 0], [ 1,-1, 0], [-1, 1, 0], [-1,-1, 0],
@@ -84,17 +85,23 @@ def gen_loop_ancors(n=0):
                   [ 0, 1,-1], [ 0,-1, 1], [ 0,-1,-1], [ 1, 1, 1], [-1, 1, 1],
                   [ 1,-1, 1], [-1,-1, 1], [ 1, 1,-1], [-1, 1,-1], [ 1,-1,-1],
                   [-1,-1,-1]]
-    if n==15:
-        # 7 aroung the middle, a row of 7 above that, and then 1 at the top
-        pistep = 2*np.pi/7
-        pis = np.arange(0, 2*np.pi, pistep)
-        
+
+    # 7 aroung the middle, a row of 7 above that, and then 1 at the top
+    pistep = 2*np.pi/7
+    pis = np.arange(0, 2*np.pi, pistep)
+
+    if n>=15:
+
         bottom = np.vstack((np.cos(pis), np.sin(pis), np.zeros(7))).T
         # for now place the middle row at 45 degrees on top of the bottom row
         middle = np.vstack((np.cos(pis+pistep/2), np.sin(pis+pistep/2), np.ones(7)*.9)).T
         top = [0, 0, 1]
         
         ancors = np.vstack((bottom, middle, top))
+
+    if n==1:
+        ancors = [[1,0,0]]
+
     return ancors
 
 def gen_coils(ancors, r, R, folder="", gradient=False, n=501):
@@ -164,7 +171,7 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
         g = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]]) # gaus per cm
         together = np.vstack((X, Y, Z))
         for i in range(3):
-            coilname = f"coil_{i}"
+
             field_folder_filepath = os.path.join(folder, coilname)
             field = g[i].dot(together) * gyro
             plot_save_field_slices(np.vstack((np.zeros(field.shape),
@@ -180,7 +187,7 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
         coilname = f"coil_{i}"
         print(f"[INFO]  Computing field for {coilname}")
         field_folder_filepath = os.path.join(folder, coilname)
-
+        print(X.shape, Y.shape, Z.shape)
         field = bs.calculate_field(coil.T, X,Y,Z)
         field = field * gyro
 
@@ -191,20 +198,28 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
         #plot_coils(coil[:,:-1], volume=volume, 
         #           folder=field_folder_filepath, name=coilname, vis=vis)
 
-        #plot_save_field_slices(field, x, y, z, Z, field_folder_filepath,
-        #                       coilname, vis)
+        plot_save_field_slices(field, x, y, z, X, Y, Z, field_folder_filepath,
+                               coilname, vis)
         np.save(os.path.join(field_folder_filepath, "field.npy"), field[:,2])
 
-    threads = []
     for i, coil in enumerate(coils):
-        threads.append(threading.Thread(target=compute_coil_field, 
-                                        args=(i,coil)))
-        threads[i].start()
-    for thread in threads:
-        thread.join()
+        compute_coil_field(i, coil)
+    #threads = []
+    #for i, coil in enumerate(coils):
+    #    threads.append(threading.Thread(target=compute_coil_field, 
+    #                                    args=(i,coil)))
+    #    threads[i].start()
+    #for thread in threads:
+    #    thread.join()
         
 
-def plot_save_field_slices(field, x, y, z, Z, folder, coilname, vis=False):
+def plot_save_field_slices(field, x, y, z, X,Y,Z, folder, coilname, vis=False):
+    xfolder = os.path.join(folder, coilname+"_x")
+    yfolder = os.path.join(folder, coilname+"_y")
+    zfolder = os.path.join(folder, coilname+"_z")
+    radius = np.sqrt(X**2 + Y**2 + Z**2)
+    roi = np.argwhere(radius >= 8)
+    field[roi] = 0
     for zlevel in z:
         plt.clf()
         level = np.where(Z == zlevel)
@@ -217,9 +232,49 @@ def plot_save_field_slices(field, x, y, z, Z, folder, coilname, vis=False):
         plt.yticks(np.linspace(-.5,len(y)-.5,11), np.linspace(-10, 10, 11))
         plt.title(f'Bz Field (Hz) of {coilname} at Z={zlevel} cm')
         norm = diverge(vcenter=0)
-        plt.imshow(bslice, cmap='RdYlGn', norm=norm)
+        plt.imshow(bslice, cmap='jet', norm=norm)
         plt.colorbar()
-        filename = os.path.join(folder, coilname+f"_{round(zlevel, 2)}.png")
+        filename = zfolder+"_{round(zlevel, 2)}.png"
+        if vis:
+            plt.show()
+        plt.savefig(filename)
+        plt.close()
+
+    for xlevel in x:
+        plt.clf()
+        level = np.where(X == xlevel)
+        bslice = field[level,2].reshape(len(y), len(z))
+        x_label,y_label = "y","z"
+        x_array,y_array = y,z
+        plt.xlabel('y (cm)')
+        plt.ylabel('z (cm)')
+        plt.xticks(np.linspace(-.5,len(y)-.5,11), np.linspace(-9.92, 9.92, 11))
+        plt.yticks(np.linspace(-.5,len(z)-.5,11), np.linspace(-12, 12, 11))
+        plt.title(f'Bz Field (Hz) of {coilname} at X={xlevel} cm')
+        norm = diverge(vcenter=0)
+        plt.imshow(bslice, cmap='jet', norm=norm)
+        plt.colorbar()
+        filename = xfolder+"_{round(xlevel, 2)}.png"
+        if vis:
+            plt.show()
+        plt.savefig(filename)
+        plt.close()
+
+    for ylevel in y:
+        plt.clf()
+        level = np.where(Y == ylevel)
+        bslice = field[level,2].reshape(len(x), len(z))
+        x_label,y_label = "x","z"
+        x_array,y_array = x,z
+        plt.xlabel('x (cm)')
+        plt.ylabel('z (cm)')
+        plt.xticks(np.linspace(-.5,len(x)-.5,11), np.linspace(-9.92, 9.92, 11))
+        plt.yticks(np.linspace(-.5,len(z)-.5,11), np.linspace(-12, 12, 11))
+        plt.title(f'Bz Field (Hz) of {coilname} at Y={ylevel} cm')
+        norm = diverge(vcenter=0)
+        plt.imshow(bslice, cmap='jet', norm=norm)
+        plt.colorbar()
+        filename = yfolder+"_{round(ylevel, 2)}.png"
         if vis:
             plt.show()
         plt.savefig(filename)
@@ -258,6 +313,7 @@ def plot_coils(coils, volume=None, field=None, pos=None, folder=None,
 
     for coil in coils:
         ax.plot(coil[:,0], coil[:,1], coil[:,2], label='parametric curve')
+
 
     if vis:
         plt.show()
@@ -327,7 +383,7 @@ if __name__ == "__main__":
 
     ancors = gen_loop_ancors(args.numcoils)
     plot_ancors_on_circle(ancors, r, R, volume_def, folder, args.vis)   
-    coils = gen_coils(ancors, r, R, folder, args.gradient)
+    coils = gen_coils(ancors, r, R, folder, args.gradient, 201)
     compute_bzfields(coils, volume_def, folder, args.vis, args.gradient)
 
 
