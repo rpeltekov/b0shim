@@ -7,4 +7,6 @@ tools/MRPhaseUnwrap.m
 data/*
 !data/headcaps/
 !data/*.zip
+!data/10*
+!data/11*
 
