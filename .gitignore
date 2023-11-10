@@ -4,6 +4,7 @@ boards/
 .ipynb_checkpoints/
 tools/itksnap/
 tools/MRPhaseUnwrap.m
-data/headcaps/
-data/*.zip
+data/*
+!data/headcaps/
+!data/*.zip
 
