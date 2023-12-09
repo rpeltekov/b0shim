@@ -124,11 +124,11 @@ if __name__ == "__main__":
                 phases2 = np.load(os.path.join(folder2, file_name))
 
         # unwrap
-        #unwrapf1, lap1 = MRPhaseUnwrap(phases1, [args.voxX, args.voxY, args.voxZ])
-        #unwrapf2, lap2 = MRPhaseUnwrap(phases2, [args.voxX, args.voxY, args.voxZ])
+        unwrapf1, lap1 = MRPhaseUnwrap(phases1, [args.voxX, args.voxY, args.voxZ])
+        unwrapf2, lap2 = MRPhaseUnwrap(phases2, [args.voxX, args.voxY, args.voxZ])
 
-        unwrapf1 = phases1
-        unwrapf2 = phases2
+        #unwrapf1 = phases1
+        #unwrapf2 = phases2
 
         delt_phase1 = unwrapf1[:,:,:,1] - unwrapf1[:,:,:,0]
         delt_phase2 = unwrapf2[:,:,:,1] - unwrapf2[:,:,:,0]
