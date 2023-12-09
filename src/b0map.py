@@ -209,7 +209,7 @@ if __name__ == "__main__":
             zsl = zsl.reshape(refslice.shape)
             alphas = alphas.reshape(refslice.shape)
             if args.nocrop:
-                alphas = np.ones(refslice.shape)
+                alphas = None
 
             fig, ax = plt.subplots()
             im = ax.imshow(zsl, alpha=alphas, cmap='jet')
