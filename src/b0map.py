@@ -192,7 +192,7 @@ if __name__ == "__main__":
         print(f'[INFO] Max field value seen {np.max(np.abs(tms_basis))}')
         for sl in range(tms_basis.shape[2]):
             xx, yy = np.meshgrid(x, y)
-            z_lev = sl
+            z_lev = sl #z[sl]
 
             radius = np.sqrt(xx**2 + yy**2 + z_lev**2*np.ones(yy.shape))
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
             fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
             plt.axis('off')
             plt.title(f'Axial Z ~ {round(z_lev)}')
-            imgname = os.path.join(axial, f"{sl}_z{z_lev.round(2)}.png")
+            imgname = os.path.join(axial, f"{sl}.png")#_z{z_lev.round(2)}.png")
             plt.savefig(imgname, transparent=True)
 
             apng.append_file(imgname)
