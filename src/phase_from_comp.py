@@ -1,11 +1,14 @@
 from pydicom import dcmread # to read the dicom images
-import dicom2nifti      # to write to nifti images
 import os               # to iterate through a folder
 import re               # to extract the number / order from a dcm folder
 import numpy as np      # to modify the images
 import matplotlib.pyplot as plt # to visualize the images
 import argparse
 import sys
+
+"""
+I want to add a feature that probes the user which TEs that they want to save
+"""
 
 if __name__ == "__main__":
 
@@ -80,6 +83,24 @@ if __name__ == "__main__":
                 print(f"[DEBUG] Max {np.max(phase)} min {np.min(phase)}")
 
             testring = "".join(["te_"]+[f"{te}_" for te in tes])
+            name = testring + "3dPhase.npy"
+            phases = np.moveaxis(phases, 0, 2)
+            np.save(os.path.join(save_dir, name), phases)
+
+            namemag = testring + "3dMag.npy"
+            mags = np.moveaxis(mags, 0, 2)
+            np.save(os.path.join(save_dir, namemag), mags)
+        elif (args.echos == 4):
+            real = np.moveaxis([reals[::4], reals[2::4]], 0, -1)
+            imag = np.moveaxis([imags[::4], imags[2::4]], 0, -1)
+            mags = np.moveaxis([mags[::4], mags[2::4]], 0, -1)
+
+            phases = np.arctan2(imag, real)
+
+            if (args.debug):
+                print(f"[DEBUG] Max {np.max(phase)} min {np.min(phase)}")
+
+            testring = "".join(["te_"]+[f"{te}_" for te in tes[0::2])
             name = testring + "3dPhase.npy"
             phases = np.moveaxis(phases, 0, 2)
             np.save(os.path.join(save_dir, name), phases)
