@@ -100,7 +100,7 @@ if __name__ == "__main__":
             if (args.debug):
                 print(f"[DEBUG] Max {np.max(phase)} min {np.min(phase)}")
 
-            testring = "".join(["te_"]+[f"{te}_" for te in tes[0::2])
+            testring = "".join(["te_"]+[f"{te}_" for te in tes[0::2]])
             name = testring + "3dPhase.npy"
             phases = np.moveaxis(phases, 0, 2)
             np.save(os.path.join(save_dir, name), phases)
