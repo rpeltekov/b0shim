@@ -1,5 +1,4 @@
 from pydicom import dcmread 
-import dicom2nifti      
 import os
 import re
 import numpy as np
