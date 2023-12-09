@@ -69,61 +69,30 @@ if __name__ == "__main__":
         imags = np.array(images_list[3::4])
         mags = np.array(images_list[::4])
 
-        real = np.moveaxis([reals[::2], reals[1::2]], 0, -1)
-        imag = np.moveaxis([imags[::2], imags[1::2]], 0, -1)
-        mags = np.moveaxis([mags[::2], mags[1::2]], 0, -1)
+        if (args.echos == 2):
+            real = np.moveaxis([reals[::2], reals[1::2]], 0, -1)
+            imag = np.moveaxis([imags[::2], imags[1::2]], 0, -1)
+            mags = np.moveaxis([mags[::2], mags[1::2]], 0, -1)
 
-        phases = np.arctan2(imag, real)
+            phases = np.arctan2(imag, real)
 
-        if (args.debug):
-            print(f"[DEBUG] Max {np.max(phase)} min {np.min(phase)}")
+            if (args.debug):
+                print(f"[DEBUG] Max {np.max(phase)} min {np.min(phase)}")
 
-        testring = "".join(["te_"]+[f"{te}_" for te in tes])
-        name = testring + "3dPhase.npy"
-        phases = np.moveaxis(phases, 0, 2)
-        np.save(os.path.join(save_dir, name), phases)
+            testring = "".join(["te_"]+[f"{te}_" for te in tes])
+            name = testring + "3dPhase.npy"
+            phases = np.moveaxis(phases, 0, 2)
+            np.save(os.path.join(save_dir, name), phases)
 
-        namemag = testring + "3dMag.npy"
-        mags = np.moveaxis(mags, 0, 2)
-        np.save(os.path.join(save_dir, namemag), mags)
+            namemag = testring + "3dMag.npy"
+            mags = np.moveaxis(mags, 0, 2)
+            np.save(os.path.join(save_dir, namemag), mags)
 
-#        if not os.path.exists(save_dir):
-#            os.makedirs(save_dir)
-#        for i in range(0,16):
-#            #save the new phases
-#            images[i*4+2].PixelData = phase[i].tobytes()
-#            images[i*4+2].save_as(os.path.join(save_dir, f"ph.MRDC.{i}"))
-#            # save the magnitudes
-#            images[i*4+1].save_as(os.path.join(save_dir, f"mag.MRDC.{i}"))
-#
-#        if (args.nifti):
-#            if not os.path.exists(nifti_save_dir):
-#                os.makedirs(nifti_save_dir)
-#            dicom2nifti.convert_directory(save_dir, nifti_save_dir, reorient=True)
-#
-#        if (args.pic):
-#            #TODO not implemented correctly right now
-#            for i in range(0,16):
-#                fig, ax = plt.subplots(2, 2, figsize=(10, 10))  # 1 row, 2 columns
-#
-#                im1 = ax[0,0].imshow(phase[i], cmap='gray')
-#                ax[0,0].set_title('phase from arctan(imag/real)')
-#                fig.colorbar(im1, ax=ax[0,0])  # Add a color bar for the first image
-#
-#                arr = og_phases[i]
-#                im2 = ax[0,1].imshow(arr, cmap='gray')
-#                ax[0,1].set_title('original phase image')
-#                fig.colorbar(im2, ax=ax[0,1])  # Add a color bar for the first image
-#
-#                arr = images_list[i*4+2]
-#                im4 = ax[1,0].imshow(arr, cmap='gray')
-#                ax[1,0].set_title('original "real" image')
-#
-#                arr = images_list[i*4+3]
-#                im5 = ax[1,1].imshow(arr, cmap='gray')
-#                ax[1,1].set_title('original "imag" image')
-#
-#                plt.show()
+        else:
+            phases = np.arctan2(imags, reals)
+            name = f"te_{tes[0]}"+"_3dPhase.npy"
+            phases = np.moveaxis(phases, 0, 2)
+            np.save(os.path.join(save_dir, name), phases)
 
 
 print("[INFO] Done.")

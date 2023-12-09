@@ -6,9 +6,25 @@ sys.path.append('../tools/biot-savart-master')
 import biot_savart_v4_3 as bs
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm as diverge
+from apng import APNG
 
 
 gyro = 4258
+
+def get_ticks(volume):
+    start = volume[0]
+    size = volume[1]
+    end = start + size
+    res = volume[2]
+    x = np.linspace(start[0], end[0], int(res[0])+1)[:-1]
+    y = np.linspace(start[1], end[1], int(res[1])+1)[:-1]
+    z = np.linspace(start[2], end[2], int(res[2])+1)[:-1]
+
+    x = x + (x[1] - x[0])/2
+    y = y + (y[1] - y[0])/2
+    z = z + (z[1] - z[0])/2
+    return x, y, z
+
 
 def coil_from_ancor(d, r, R, n=100):
     """ 
@@ -100,7 +116,7 @@ def gen_loop_ancors(n=0):
         ancors = np.vstack((bottom, middle, top))
 
     if n==1:
-        ancors = [[1,0,0]]
+        ancors = [[0,0,1]]
 
     return ancors
 
@@ -144,34 +160,19 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
 
         if z is None, it will return the magnetization for the whole volume.
     """
-    start = volume[0]
-    size = volume[1]
-    end = start + size
-    res = volume[2]
-    x = np.linspace(start[0], end[0], int(res[0])+1)[:-1]
-    y = np.linspace(start[1], end[1], int(res[1])+1)[:-1]
-    z = np.linspace(start[2], end[2], int(res[2])+1)[:-1]
-
-    x = x + (x[1] - x[0])/2
-    y = y + (y[1] - y[0])/2
-    z = z + (z[1] - z[0])/2
+    x, y, z = get_ticks(volume)
 
     X, Y, Z = np.meshgrid(x, y, z)
     Z = Z.flatten()
     Y = Y.flatten()
     X = X.flatten()
 
-    if debug:
-        print(f"DEBUG: X shape {X.shape} {X}")
-        print(f"DEBUG: Y shape {Y.shape} {Y}")
-        print(f"DEBUG: Z shape {Z.shape} {Z}")
-
     fields = []
     if gradient:
         g = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]]) # gaus per cm
         together = np.vstack((X, Y, Z))
         for i in range(3):
-
+            coilname = f"coil_{i}"
             field_folder_filepath = os.path.join(folder, coilname)
             field = g[i].dot(together) * gyro
             plot_save_field_slices(np.vstack((np.zeros(field.shape),
@@ -187,106 +188,82 @@ def compute_bzfields(coils, volume, folder, vis=False, gradient=False, debug=Fal
         coilname = f"coil_{i}"
         print(f"[INFO]  Computing field for {coilname}")
         field_folder_filepath = os.path.join(folder, coilname)
-        print(X.shape, Y.shape, Z.shape)
-        field = bs.calculate_field(coil.T, X,Y,Z)
-        field = field * gyro
 
-        #if debug:
-        #    # print the quiver plot of the coil and its field vectors
-        #    plot_coils(coil[:,:-1], volume=volume, field=field, 
-        #               pos=np.vstack((X,Y,Z)), vis=True)
-        #plot_coils(coil[:,:-1], volume=volume, 
-        #           folder=field_folder_filepath, name=coilname, vis=vis)
+        centerpoint = bs.calculate_field(coil.T, 0, 0, 5)
+        print("[INFO]: the center of the coil sees this magnetic field gaus:", centerpoint)
+        mag = np.sqrt(np.sum(centerpoint**2))
+        print("[INFO]: magnitude", mag)
 
-        plot_save_field_slices(field, x, y, z, X, Y, Z, field_folder_filepath,
-                               coilname, vis)
-        np.save(os.path.join(field_folder_filepath, "field.npy"), field[:,2])
+        # if i am iterating the plots, and data is available, reuse it
+        if os.path.exists(os.path.join(field_folder_filepath, "field.npy")):
+            field = np.load(os.path.join(field_folder_filepath, "field.npy"))
+        else:
+            field = bs.calculate_field(coil.T, X,Y,Z)
+            field = field * gyro
 
-    for i, coil in enumerate(coils):
-        compute_coil_field(i, coil)
-    #threads = []
-    #for i, coil in enumerate(coils):
-    #    threads.append(threading.Thread(target=compute_coil_field, 
-    #                                    args=(i,coil)))
-    #    threads[i].start()
-    #for thread in threads:
-    #    thread.join()
+            field = field[:,2]
+            np.save(os.path.join(field_folder_filepath, "field.npy"), field)
+
+        plot_save_field_slices(field, x, y, z, X, Y, Z, 
+                               field_folder_filepath, coilname, vis)
+
+    if len(coils) < 3:
+        for i, coil in enumerate(coils):
+            compute_coil_field(i, coil)
+    else:
+        threads = []
+        for i, coil in enumerate(coils):
+            threads.append(threading.Thread(target=compute_coil_field, 
+                                            args=(i,coil)))
+            threads[i].start()
+        for thread in threads:
+            thread.join()
         
 
 def plot_save_field_slices(field, x, y, z, X,Y,Z, folder, coilname, vis=False):
-    xfolder = os.path.join(folder, coilname+"_x")
-    yfolder = os.path.join(folder, coilname+"_y")
-    zfolder = os.path.join(folder, coilname+"_z")
+    zfolder = os.path.join(folder, "z")
+    if not os.path.exists(zfolder):
+        os.makedirs(zfolder)
     radius = np.sqrt(X**2 + Y**2 + Z**2)
-    roi = np.argwhere(radius >= 8)
-    field[roi] = 0
-    for zlevel in z:
-        plt.clf()
+    r_outside_i = np.argwhere(radius >= 8)
+    field[r_outside_i] = 0
+    alpha = np.ones(field.shape)
+    alpha[r_outside_i] = 0
+
+    print('[INFO] Saving axial slices of coil to png and apng')
+    print(f'[INFO] Max value: {np.max(np.abs(field))}')
+    apng = APNG()
+    for i, zlevel in enumerate(z):
         level = np.where(Z == zlevel)
-        bslice = field[level,2].reshape(len(x), len(y))
+        bslice = field[level].reshape(len(x), len(y))
+        aslice = alpha[level].reshape(len(x), len(y))
+        bslice = -np.flip(bslice, axis=0)
+        if not aslice.any():
+            continue
         x_label,y_label = "x","y"
         x_array,y_array = x,y
         plt.xlabel('x (cm)')
         plt.ylabel('y (cm)')
-        plt.xticks(np.linspace(-.5,len(x)-.5,11), np.linspace(-10, 10, 11))
-        plt.yticks(np.linspace(-.5,len(y)-.5,11), np.linspace(-10, 10, 11))
+        plt.xticks(np.linspace(0,len(x)-1,5), np.linspace(x[-1], x[0], 5))
+        plt.yticks(np.linspace(0,len(y)-1,11), np.linspace(y[-1], y[0], 11))
         plt.title(f'Bz Field (Hz) of {coilname} at Z={zlevel} cm')
-        norm = diverge(vcenter=0)
-        plt.imshow(bslice, cmap='jet', norm=norm)
+        plt.imshow(bslice, alpha=aslice, cmap='jet')
+        plt.clim(-300,300)
         plt.colorbar()
-        filename = zfolder+"_{round(zlevel, 2)}.png"
+        filename = os.path.join(zfolder,f"{i}_{round(zlevel, 2)}.png")
         if vis:
             plt.show()
-        plt.savefig(filename)
+        plt.savefig(filename, transparent=True)
+        apng.append_file(filename)
         plt.close()
+    apng.save(os.path.join(zfolder,f'anim.apng'))
 
-    for xlevel in x:
-        plt.clf()
-        level = np.where(X == xlevel)
-        bslice = field[level,2].reshape(len(y), len(z))
-        x_label,y_label = "y","z"
-        x_array,y_array = y,z
-        plt.xlabel('y (cm)')
-        plt.ylabel('z (cm)')
-        plt.xticks(np.linspace(-.5,len(y)-.5,11), np.linspace(-9.92, 9.92, 11))
-        plt.yticks(np.linspace(-.5,len(z)-.5,11), np.linspace(-12, 12, 11))
-        plt.title(f'Bz Field (Hz) of {coilname} at X={xlevel} cm')
-        norm = diverge(vcenter=0)
-        plt.imshow(bslice, cmap='jet', norm=norm)
-        plt.colorbar()
-        filename = xfolder+"_{round(xlevel, 2)}.png"
-        if vis:
-            plt.show()
-        plt.savefig(filename)
-        plt.close()
-
-    for ylevel in y:
-        plt.clf()
-        level = np.where(Y == ylevel)
-        bslice = field[level,2].reshape(len(x), len(z))
-        x_label,y_label = "x","z"
-        x_array,y_array = x,z
-        plt.xlabel('x (cm)')
-        plt.ylabel('z (cm)')
-        plt.xticks(np.linspace(-.5,len(x)-.5,11), np.linspace(-9.92, 9.92, 11))
-        plt.yticks(np.linspace(-.5,len(z)-.5,11), np.linspace(-12, 12, 11))
-        plt.title(f'Bz Field (Hz) of {coilname} at Y={ylevel} cm')
-        norm = diverge(vcenter=0)
-        plt.imshow(bslice, cmap='jet', norm=norm)
-        plt.colorbar()
-        filename = yfolder+"_{round(ylevel, 2)}.png"
-        if vis:
-            plt.show()
-        plt.savefig(filename)
-        plt.close()
 
 def plot_coils(coils, volume=None, field=None, pos=None, folder=None,
                name=None, vis=False):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
-    # TODO: fix this logic it is so stupid but ig you just need something that
-    # works
     if volume is not None:
         maxdim = np.max(volume[1])*np.ones(3)
         start = -maxdim/2
@@ -320,7 +297,7 @@ def plot_coils(coils, volume=None, field=None, pos=None, folder=None,
     plt.savefig(os.path.join(folder, "headcap.png"))
     plt.close()
 
-def plot_ancors_on_circle(ancors, r, R, volume, folder, vis):
+def plot_ancors(ancors, r, R, volume, folder, vis):
 
     # add the sphere to the drawing
     # u = np.linspace(0, 2 * np.pi, 100)
@@ -382,7 +359,7 @@ if __name__ == "__main__":
         print(f"[INFO] calculating basis maps in {folder}")
 
     ancors = gen_loop_ancors(args.numcoils)
-    plot_ancors_on_circle(ancors, r, R, volume_def, folder, args.vis)   
+    plot_ancors(ancors, r, R, volume_def, folder, args.vis)   
     coils = gen_coils(ancors, r, R, folder, args.gradient, 201)
     compute_bzfields(coils, volume_def, folder, args.vis, args.gradient)
 

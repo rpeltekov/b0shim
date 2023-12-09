@@ -10,6 +10,20 @@ from matplotlib import pyplot as plt
 # save them to a
 # output the estimated corrected basis map
 
+def get_ticks(volume):
+    start = volume[0]
+    size = volume[1]
+    end = start + size
+    res = volume[2]
+    x = np.linspace(start[0], end[0], int(res[0])+1)[:-1]
+    y = np.linspace(start[1], end[1], int(res[1])+1)[:-1]
+    z = np.linspace(start[2], end[2], int(res[2])+1)[:-1]
+
+    x = x + (x[1] - x[0])/2
+    y = y + (y[1] - y[0])/2
+    z = z + (z[1] - z[0])/2
+    return x, y, z
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("coilsfolder", default="default", help="")
@@ -26,6 +40,8 @@ if __name__ == "__main__":
     obj = "_".join(obj[0:-1])
 
     R = args.roi
+    
+    log = ''
 
     infodir = f"shim_results/"+obj+f"-roi{R}-"+headcap
     outputdir = f"shim_results/"+obj+f"-roi{R}-"+headcap+("/perslice/" if args.perslice else "")
@@ -44,7 +60,9 @@ if __name__ == "__main__":
     volume = np.loadtxt(os.path.join(coilsfolder, 'volume_def.txt'))
     numcoils = int(volume[3,2])
 
-    print(f"SHIMMING ROI RADIUS {R} cm with {numcoils} coils")
+    infostart = f"SHIMMING ROI RADIUS {R} cm with {numcoils} coils"
+    print(infostart)
+    log += infostart + '\n'
 
     if args.v:
         print("[INFO] collecting the basis functions")
@@ -190,18 +208,14 @@ if __name__ == "__main__":
             plt.savefig(os.path.join(b0offres, f"{z}.png"))
             plt.close()
     else:
-        start = volume[0].astype(float)
-        end = volume[0].astype(float) + volume[1].astype(float)
 
-        xx = np.linspace(start[0], end[0], int(offres.shape[0])+1)[:-1]
-        yy = np.linspace(start[1], end[1], int(offres.shape[1])+1)[:-1]
-        zz = np.linspace(start[2], end[2], int(offres.shape[2])+1)[:-1]
+        start = volume[0]
+        size = volume[1]
+        end = start + size
 
-        xx = xx + (xx[1] - xx[0])/2
-        yy = yy + (yy[1] - yy[0])/2
-        zz = zz + (zz[1] - zz[0])/2
+        x, y, zz = get_ticks(volume)
 
-        xx, yy = np.meshgrid(xx, yy)
+        xx, yy = np.meshgrid(x, y)
         xx = xx.flatten()
         yy = yy.flatten()
 
@@ -209,12 +223,17 @@ if __name__ == "__main__":
         mi = 0
         outputmaps = []
         references = []
+        alphas = []
         zis = []
         currents = []
+        outforstd = []
+        refforstd = []
 
         solvers.options['show_progress'] = False
 
-        print("[INFO] forming QP problem PER slice")
+        start_solve_str = "[INFO] forming QP problem PER slice"
+        print(start_solve_str)
+        log += start_solve_str + '\n\n'
         for zi in range(offres.shape[2]):
             z = zz[zi]
             radius = np.sqrt(xx**2 + yy**2 + z**2*np.ones(yy.shape))
@@ -231,6 +250,8 @@ if __name__ == "__main__":
             num_pos = int(offres.shape[0]*offres.shape[1])
             A = basis_slice.reshape((numcoils, num_pos)).T
             y = ref_slice.reshape((num_pos,))
+            alpha = np.zeros((num_pos,))
+            alpha[in_phantom] = 1.0
 
             if args.v:
                 print(f"[INFO] A: {A.shape}, y: {y.shape}")
@@ -274,45 +295,65 @@ if __name__ == "__main__":
             reference = np.zeros(y.shape)
             if args.v:
                 print(f"[INFO] inputs: {outputmap[in_phantom].shape}")
+            output = corrections + y_masked
+
+            # assemble the ROI back in the FOV
             outputmap[in_phantom] = corrections + y_masked
             reference[in_phantom] = y_masked
+            alpha = alpha.reshape(ref_slice.shape)
 
+            zis.append(zi)
             outputmaps.append(outputmap.reshape(ref_slice.shape))
             references.append(reference.reshape(ref_slice.shape))
-            zis.append(zi)
-            currents.append(x)
+            alphas.append(alpha)
+            if args.gradient:
+                currents = np.concatenate((currents, x[3:]))
+                avg_slice_current = np.mean(np.abs(x[3:]))
+                max_slice_current = np.max(np.abs(x[3:]))
+            else:
+                currents = np.concatenate((currents, x))
+                avg_slice_current = np.mean(np.abs(x))
+                max_slice_current = np.max(np.abs(x))
 
-        print('[INFO] solved all slices')
-            
+            reference_std     = np.std(y_masked)
+            output_std        = np.std(output)
+
+            outforstd = np.concatenate((outforstd, output))
+            refforstd = np.concatenate((refforstd, y_masked))
+
+            outputstr = f'[INFO] SLICE {zz[zi]}\n' + \
+                        f'\t  reference STD  = {reference_std}\n' + \
+                        f'\t  output    STD  = {output_std}\n' + \
+                        f'\t  average current= {avg_slice_current}\n' + \
+                        f'\t  max current    = {max_slice_current}'
+            log += outputstr + '\n'
+            print(outputstr)
+
+        done_str = '[INFO] solved all slices'
+        print(done_str)
+        log += done_str + '\n\n'
+
         outputmaps = np.array(outputmaps)
         references = np.array(references)
-        currents = np.array(currents)
+        avg_current = np.mean(np.abs(currents))
+        max_current = np.max(np.abs(currents))
+
+        output_vol_std = np.std(outforstd)
+        reference_vol_std = np.std(refforstd)
+
+        volume_stats = "[INFO] VOLUME STATISTICS:\n" + \
+                    f'\t VOLUME reference STD   = {reference_vol_std}\n' + \
+                    f'\t VOLUME output    STD   = {output_vol_std}\n' + \
+                    f'\t VOLUME max current     = {max_current}\n' + \
+                    f'\t VOLUME average current = {avg_current}'
+        print(volume_stats)
+        log += volume_stats + "\n"
         
-        xx = np.linspace(start[0], end[0], int(offres.shape[0])+1)[:-1]
-        yy = np.linspace(start[1], end[1], int(offres.shape[1])+1)[:-1]
-        XX, YY, ZZ = np.meshgrid(xx,yy,zz)
-        XX = XX.flatten()
-        YY = YY.flatten()
-        ZZ = ZZ.flatten()
-        RR = np.argwhere(np.sqrt(XX**2 + YY**2 + ZZ**2) < R)
+        with open(os.path.join(infodir, "performance.txt"), 'w') as perf:
+            perf.write(log)
 
-        outputmaps_f = outputmaps.flatten()
-        references_f = references.flatten()
-
-        rmse_outputmaps = np.sqrt(1/len(RR) * np.sum((outputmaps_f)**2))
-        rmse_references = np.sqrt(1/len(RR) * np.sum((references_f)**2))
-        rmse_difference = rmse_references - rmse_outputmaps
-        percent = (rmse_difference/rmse_references*100).round(2)
-        print(f'[INFO] RMSE reference ROI = {rmse_references}')
-        print(f'[INFO] RMSE shimmed ROI   = {rmse_outputmaps}')
-        print(f'[INFO] increase in RMSE   = {rmse_difference}')
-        print(f'[INFO] %increase in RMSE  = {percent}%')
-        
-        np.savetxt(os.path.join(infodir, f"performance_{percent}.txt"),
-                   [R, rmse_references, rmse_outputmaps, rmse_difference, percent])
-
-        ma = max(np.max(outputmaps), np.max(references))
-        mi = min(np.min(outputmaps), np.min(references))
+        ma = 120
+        mi = -120
 
         np.save(os.path.join(infodir, "corrected_cropped_offres.npy"), outputmaps)
         np.save(os.path.join(infodir, "original_cropped_offres.npy"), references)
@@ -322,7 +363,7 @@ if __name__ == "__main__":
         for i, zi in enumerate(zis):
             fig, ax = plt.subplots(1,2, figsize=(14, 5))
 
-            im0 = ax[0].imshow(references[i], cmap='jet')
+            im0 = ax[0].imshow(references[i], alpha=alphas[i], cmap='jet')
             ax[0].set_title("original off resonance (Hz)")
             ax[0].set_xlabel("X (cm)")
             ax[0].set_xticks(np.linspace(-.5,int(offres.shape[0])-.5,9), 
@@ -333,7 +374,7 @@ if __name__ == "__main__":
             im0.set_clim(mi, ma)
             fig.colorbar(im0, ax=ax[0], fraction=0.046, pad=0.04)
             
-            im1 = ax[1].imshow(outputmaps[i], cmap='jet')
+            im1 = ax[1].imshow(outputmaps[i], alpha=alphas[i], cmap='jet')
             ax[1].set_title(f"corrected off resonance (Hz) z={zz[zi].round(2)}")
             ax[1].set_xlabel("X (cm)")
             ax[1].set_xticks(np.linspace(-.5,int(offres.shape[0])-.5,9),
@@ -344,14 +385,7 @@ if __name__ == "__main__":
             im1.set_clim(mi, ma)
             fig.colorbar(im1, ax=ax[1], fraction=0.046, pad=0.04)
 
-            plt.savefig(os.path.join(outputdir, f"{zi}corr_z_{zz[zi].round(2)}.png"))
+            plt.savefig(os.path.join(outputdir,f"{zi}corr_z_{zz[zi].round(2)}.png"),
+                        transparent=True)
             plt.close()
- 
-            #plt.imshow(outputmaps[i], cmap='jet')
-            #plt.title(f"corrected fieldmap at z = {zz[zi]}")
-            #plt.colorbar(fraction=0.046, pad=0.04)
-            #plt.clim(mi, ma)
-            #plt.savefig(os.path.join(b0offres, f"{zi}.png"))
-            #plt.close()
-        
 
