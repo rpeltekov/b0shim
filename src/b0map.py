@@ -192,7 +192,7 @@ if __name__ == "__main__":
         print(f'[INFO] Max field value seen {np.max(np.abs(tms_basis))}')
         for sl in range(tms_basis.shape[2]):
             xx, yy = np.meshgrid(x, y)
-            z_lev = z[sl]
+            z_lev = sl
 
             radius = np.sqrt(xx**2 + yy**2 + z_lev**2*np.ones(yy.shape))
 
