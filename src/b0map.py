@@ -89,11 +89,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="3d basis")
     parser.add_argument("folder1", type=str,default=0, help="")
     parser.add_argument("folder2", type=str,default=0, help="")
-    parser.add_argument("--voxX", type=int,default=0.9375, help="")
-    parser.add_argument("--voxY", type=int,default=0.9375, help="")
-    parser.add_argument("--voxZ", type=int,default=1.6, help="")
+    parser.add_argument("--voxX", type=int,default=1.5625, help="")
+    parser.add_argument("--voxY", type=int,default=1.5625, help="")
+    parser.add_argument("--voxZ", type=int,default=2, help="")
     parser.add_argument("--debug", action="store_true", help="")
     parser.add_argument("--channel", action="store_true", help="")
+    parser.add_argument("--nocrop", action="store_true", help="")
     parser.add_argument("-R", type=float,default=1.6, help="")
 
     args = parser.parse_args()
@@ -197,7 +198,7 @@ if __name__ == "__main__":
 
             in_phantom = np.argwhere(radius.flatten() <= args.R).flatten()
 
-            if len(in_phantom) == 0:
+            if len(in_phantom) == 0 and not args.nocrop:
                 continue
 
             num_pos = int(tms_basis.shape[0]*tms_basis.shape[1])
@@ -207,6 +208,8 @@ if __name__ == "__main__":
             alphas[in_phantom] = 1.0
             zsl = zsl.reshape(refslice.shape)
             alphas = alphas.reshape(refslice.shape)
+            if args.nocrop:
+                alphas = np.ones(refslice.shape)
 
             fig, ax = plt.subplots()
             im = ax.imshow(zsl, alpha=alphas, cmap='jet')
